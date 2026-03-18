@@ -3,7 +3,7 @@
 bl_info = {
     "name": "BF2 Export Helper",
     "author": "[R-DEV]PotatoLord, Project Reality Team",
-    "version": (0, 2),
+    "version": (0, 21),
     "blender": (4, 5, 0),
     "location": "View3d > N",
     "description": "To be used in conjunction with BF2 Tools",
@@ -177,6 +177,7 @@ class HierarchyOperator(bpy.types.Operator):
             g0l0.scale = original.scale * scale_factor
             g0l0.parent = g0
             g0l0.matrix_parent_inverse = g0.matrix_world.inverted()
+            
 
             for child in children:
                 child_base_name = child.name.replace('G1L0__', '')
@@ -277,8 +278,12 @@ _classes = [
 
 def register():
     bpy.types.Scene.lods_num = bpy.props.IntProperty(name="LOD Count (Not including LOD0)", default=3, min=1, max=10)
-    bpy.types.Scene.g0_scale_up = bpy.props.BoolProperty(name="Scale Up", default=True)
-    bpy.types.Scene.g0_scale_percent = bpy.props.FloatProperty(name="Scale %", default=7.0, min=0.0, max=100.0)
+    bpy.types.Scene.g0_scale_up = bpy.props.BoolProperty(
+        name="Scale Up",
+        default=True,
+        description="G1L0: Selected object is the G1L0, G0L0 will be scaled up from it.\nG0L0: Selected object is the G0L0, G1L0 will be scaled down from it."
+    )
+    bpy.types.Scene.g0_scale_percent = bpy.props.FloatProperty(name="Scale %", default=0.0, min=0.0, max=100.0)
     for cls in _classes:
         register_class(cls)
 
