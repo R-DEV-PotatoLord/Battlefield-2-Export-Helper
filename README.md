@@ -10,10 +10,4 @@ Functionality in v0.2X includes generating hierarchy required for .bundledmesh e
 Thanks to [R-COM] Chockyto for helping me test functionality!
 
 Documentation video:
-<iframe
-  width="1207"
-  height="679"
-  src="https://www.youtube.com/embed/Lo7lZhgC-YQ"
-  frameborder="0"
-  allowfullscreen>
-</iframe>
+[![BF2 Bundledmesh Export](https://img.youtube.com/vi/Lo7lZhgC-YQ/0.jpg)](https://www.youtube.com/watch?v=Lo7lZhgC-YQ)
