@@ -3,7 +3,7 @@
 bl_info = {
     "name": "BF2 Export Helper",
     "author": "[R-DEV]PotatoLord, Project Reality Team",
-    "version": (0, 21),
+    "version": (0, 22),
     "blender": (4, 5, 0),
     "location": "View3d > N",
     "description": "To be used in conjunction with BF2 Tools",
@@ -149,9 +149,8 @@ class HierarchyOperator(bpy.types.Operator):
         base_name = original.name
         children = list(original.children)
         collection = original.users_collection[0]
-        scale_up = context.scene.g0_scale_up
         scale_percent = context.scene.g0_scale_percent
-        scale_factor = 1 + (scale_percent / 100) if scale_up else 1 - (scale_percent / 100)
+        scale_factor = scale_percent / 100
 
         bundled = make_empty(f"bundledmesh__{base_name}", collection)
         g0 = make_empty(f"G0__{base_name}", collection)
@@ -165,70 +164,40 @@ class HierarchyOperator(bpy.types.Operator):
             add_triangulate(child)
             rename_uv_to_uv0(child)
 
-        if scale_up:
-            original.name = f"G1L0__{base_name}"
-            for child in children:
-                child.name = f"G1L0__{child.name}"
+        original.name = f"G0L0__{base_name}"
+        for child in children:
+            child.name = f"G0L0__{child.name}"
 
-            lod_objects = gen_lod_chain(original, children, count, base_name, 'G1L0__')
+        g1l0 = duplicate_obj(original)
+        g1l0.name = f"G1L0__{base_name}"
+        g1l0.scale = original.scale * scale_factor
+        apply_scale(g1l0)
 
-            g0l0 = duplicate_obj(original)
-            g0l0.name = f"G0L0__{base_name}"
-            g0l0.scale = original.scale * scale_factor
-            g0l0.parent = g0
-            g0l0.matrix_parent_inverse = g0.matrix_world.inverted()
-            
+        g1l0_children = []
+        for child in children:
+            child_base_name = child.name.replace('G0L0__', '')
+            g1l0_child = duplicate_obj(child)
+            g1l0_child.name = f"G1L0__{child_base_name}"
+            g1l0_child.scale = child.scale * scale_factor
+            g1l0_child.location = g1l0.location + (child.location - g1l0.location) * scale_factor
+            apply_scale(g1l0_child)
+            g1l0_child.parent = g1l0
+            g1l0_child.matrix_parent_inverse = g1l0.matrix_world.inverted()
+            g1l0_children.append((g1l0_child, child_base_name))
 
-            for child in children:
-                child_base_name = child.name.replace('G1L0__', '')
-                g0_child = duplicate_obj(child)
-                g0_child.name = f"G0L0__{child_base_name}"
-                g0_child.scale = child.scale * scale_factor
-                g0_child.location = g0l0.location + (child.location - g0l0.location) * scale_factor
-                g0_child.parent = g0l0
-                g0_child.matrix_parent_inverse = g0l0.matrix_world.inverted()
+        lod_objects = gen_lod_chain(g1l0, [c for c, _ in g1l0_children], count, base_name, 'G1L0__')
 
-            original.parent = g1
-            original.matrix_parent_inverse = g1.matrix_world.inverted()
-            for lod in lod_objects:
-                lod.parent = g1
-                lod.matrix_parent_inverse = g1.matrix_world.inverted()
+        original.parent = g0
+        original.matrix_parent_inverse = g0.matrix_world.inverted()
+        for child in children:
+            child.parent = original
+            child.matrix_parent_inverse = original.matrix_world.inverted()
 
-        else:
-            original.name = f"G0L0__{base_name}"
-            for child in children:
-                child.name = f"G0L0__{child.name}"
-
-            g1l0 = duplicate_obj(original)
-            g1l0.name = f"G1L0__{base_name}"
-            g1l0.scale = original.scale * scale_factor
-            apply_scale(g1l0)
-
-            g1l0_children = []
-            for child in children:
-                child_base_name = child.name.replace('G0L0__', '')
-                g1l0_child = duplicate_obj(child)
-                g1l0_child.name = f"G1L0__{child_base_name}"
-                g1l0_child.scale = child.scale * scale_factor
-                g1l0_child.location = g1l0.location + (child.location - g1l0.location) * scale_factor
-                apply_scale(g1l0_child)
-                g1l0_child.parent = g1l0
-                g1l0_child.matrix_parent_inverse = g1l0.matrix_world.inverted()
-                g1l0_children.append((g1l0_child, child_base_name))
-
-            lod_objects = gen_lod_chain(g1l0, [c for c, _ in g1l0_children], count, base_name, 'G1L0__')
-
-            original.parent = g0
-            original.matrix_parent_inverse = g0.matrix_world.inverted()
-            for child in children:
-                child.parent = original
-                child.matrix_parent_inverse = original.matrix_world.inverted()
-
-            g1l0.parent = g1
-            g1l0.matrix_parent_inverse = g1.matrix_world.inverted()
-            for lod in lod_objects:
-                lod.parent = g1
-                lod.matrix_parent_inverse = g1.matrix_world.inverted()
+        g1l0.parent = g1
+        g1l0.matrix_parent_inverse = g1.matrix_world.inverted()
+        for lod in lod_objects:
+            lod.parent = g1
+            lod.matrix_parent_inverse = g1.matrix_world.inverted()
 
         return {'FINISHED'}
 
@@ -254,13 +223,7 @@ class CustomPanel(bpy.types.Panel):
         box.operator(ButtonOperator.bl_idname, text="Generate LODs Only", icon='MOD_DECIM')
 
         split = box.split(factor=0.4)
-        split.label(text="Current is")
-        row = split.row(align=True)
-        row.prop(scene, "g0_scale_up", text="G1L0", toggle=True)
-        row.prop(scene, "g0_scale_up", text="G0L0", toggle=True, invert_checkbox=True)
-
-        split = box.split(factor=0.4)
-        split.label(text="Scale Factor")
+        split.label(text="G1 Scale %")
         split.prop(scene, "g0_scale_percent", text="")
 
         big_row = box.row()
@@ -278,18 +241,12 @@ _classes = [
 
 def register():
     bpy.types.Scene.lods_num = bpy.props.IntProperty(name="LOD Count (Not including LOD0)", default=3, min=1, max=10)
-    bpy.types.Scene.g0_scale_up = bpy.props.BoolProperty(
-        name="Scale Up",
-        default=True,
-        description="G1L0: Selected object is the G1L0, G0L0 will be scaled up from it.\nG0L0: Selected object is the G0L0, G1L0 will be scaled down from it."
-    )
-    bpy.types.Scene.g0_scale_percent = bpy.props.FloatProperty(name="Scale %", default=0.0, min=0.0, max=100.0)
+    bpy.types.Scene.g0_scale_percent = bpy.props.FloatProperty(name="Scale of G1 in relation to G0", default=100.0, min=0.0, max=100.0)
     for cls in _classes:
         register_class(cls)
 
 def unregister():
     del bpy.types.Scene.lods_num
-    del bpy.types.Scene.g0_scale_up
     del bpy.types.Scene.g0_scale_percent
     for cls in _classes:
         unregister_class(cls)
